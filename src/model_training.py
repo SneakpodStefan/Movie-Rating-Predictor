@@ -133,6 +133,7 @@ def train_host_model(features: pd.DataFrame,
     models_dir.mkdir(exist_ok=True)
     model_path = models_dir / f'{host}_model.joblib'
     joblib.dump(final_model, model_path)
+    logging.info(f"\nModell für {host} wurde erstellt und gespeichert unter: {model_path}")
     
     return metrics, final_model
 
