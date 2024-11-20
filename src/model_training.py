@@ -15,8 +15,7 @@ def setup_logging():
         level=logging.INFO,
         format='%(asctime)s - %(message)s',
         handlers=[
-            logging.FileHandler(log_dir / "model_metrics.log"),
-            logging.StreamHandler()
+            logging.FileHandler(log_dir / "model_metrics.log")
         ]
     )
 
@@ -100,7 +99,7 @@ def train_host_model(features: pd.DataFrame,
     return metrics, model
 
 def print_model_metrics(metrics, host):
-    # Detaillierte Metriken in Log schreiben
+    # In Datei loggen
     logging.info(f"\nDetaillierte Metriken für {host}")
     logging.info("=" * 50)
     logging.info(f"Anzahl Bewertungen: {metrics['n_train']}")
@@ -115,7 +114,7 @@ def print_model_metrics(metrics, host):
     for feature, importance in metrics['feature_importance'].items():
         logging.info(f"{feature:20} {importance:.3f}")
     
-    # Kompakte Ausgabe für Console
+    # Nur kompakte Ausgabe in Konsole
     print(f"\nModell für {host}")
     print("=" * (len(host) + 10))
     print(f"Bewertungen: {metrics['n_train']}")
