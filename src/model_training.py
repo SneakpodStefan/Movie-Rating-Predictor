@@ -4,6 +4,21 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import pandas as pd
 import numpy as np
 from typing import Dict, Tuple
+import logging
+from pathlib import Path
+
+def setup_logging():
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_dir / "model_metrics.log"),
+            logging.StreamHandler()
+        ]
+    )
 
 def train_host_model(features: pd.DataFrame, 
                     ratings: pd.Series,
@@ -84,22 +99,32 @@ def train_host_model(features: pd.DataFrame,
     
     return metrics, model
 
-def print_model_metrics(metrics: Dict, host: str):
-    """
-    Gibt die Modell-Metriken formatiert aus
-    """
-    print(f"\nModell-Metriken für {host}")
-    print("=" * (18 + len(host)))
-    print(f"Anzahl Bewertungen: {metrics['n_train']}")
+def print_model_metrics(metrics, host):
+    # Detaillierte Metriken in Log schreiben
+    logging.info(f"\nDetaillierte Metriken für {host}")
+    logging.info("=" * 50)
+    logging.info(f"Anzahl Bewertungen: {metrics['n_train']}")
+    logging.info("\nFehlermetriken (5-Fold Cross-Validation):")
+    logging.info(f"Train RMSE: {metrics['train_rmse']:.3f}")
+    logging.info(f"Test RMSE: {metrics['test_rmse']:.3f}")
+    logging.info(f"Train MAE: {metrics['train_mae']:.3f}")
+    logging.info(f"Test MAE: {metrics['test_mae']:.3f}")
+    logging.info(f"Train R²: {metrics['train_r2']:.3f}")
+    logging.info(f"Test R²: {metrics['test_r2']:.3f}")
+    logging.info("\nFeature Importance:")
+    for feature, importance in metrics['feature_importance'].items():
+        logging.info(f"{feature:20} {importance:.3f}")
     
-    print("\nDurchschnittliche Fehlermetriken über 5 Folds:")
-    print(f"Train RMSE: {metrics['train_rmse']:.3f}")
+    # Kompakte Ausgabe für Console
+    print(f"\nModell für {host}")
+    print("=" * (len(host) + 10))
+    print(f"Bewertungen: {metrics['n_train']}")
+    
+    print("\nPerformance (5-Fold CV):")
     print(f"Test RMSE: {metrics['test_rmse']:.3f}")
-    print(f"Train MAE: {metrics['train_mae']:.3f}")
-    print(f"Test MAE: {metrics['test_mae']:.3f}")
-    print(f"Train R²: {metrics['train_r2']:.3f}")
-    print(f"Test R²: {metrics['test_r2']:.3f}")
+    print(f"Test R²:   {metrics['test_r2']:.3f}")
     
-    print("\nTop 10 wichtigste Features (Durchschnitt über alle Folds):")
-    for feature, importance in list(metrics['feature_importance'].items())[:10]:
-        print(f"{feature}: {importance:.3f}")
+    print("\nWichtigste Features:")
+    for feature, importance in list(metrics['feature_importance'].items())[:5]:
+        print(f"{feature:20} {importance:.3f}")
+    print()
