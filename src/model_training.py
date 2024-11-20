@@ -6,18 +6,39 @@ import numpy as np
 from typing import Dict, Tuple
 import logging
 from pathlib import Path
+from datetime import datetime
+import glob
 
 def setup_logging():
+    # Logging-Verzeichnis erstellen
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
     
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_dir / "model_metrics.log")
-        ]
-    )
+    # Zeitstempel für den Dateinamen
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"model_metrics_{timestamp}.log"
+    
+    # Alte Logs aufräumen - behalte nur die 10 neuesten
+    log_files = sorted(glob.glob(str(log_dir / "model_metrics_*.log")))
+    if len(log_files) > 9:  # 9, weil wir gleich eine neue erstellen
+        for old_file in log_files[:-9]:
+            Path(old_file).unlink()
+    
+    # Logging konfigurieren
+    handler = logging.FileHandler(log_file)
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    handler.setFormatter(formatter)
+    
+    # Root Logger konfigurieren
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Entferne alte Handler
+    for old_handler in root_logger.handlers[:]:
+        root_logger.removeHandler(old_handler)
+    
+    # Füge neuen Handler hinzu
+    root_logger.addHandler(handler)
 
 def train_host_model(features: pd.DataFrame, 
                     ratings: pd.Series,
