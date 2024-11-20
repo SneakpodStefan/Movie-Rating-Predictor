@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 import glob
+import joblib
 
 def setup_logging():
     # Logging-Verzeichnis erstellen
@@ -117,7 +118,23 @@ def train_host_model(features: pd.DataFrame,
         sorted(avg_importance.items(), key=lambda x: x[1], reverse=True)
     )
     
-    return metrics, model
+    # Modell auf allen Daten trainieren (für finale Vorhersagen)
+    final_model = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=None,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        random_state=42
+    )
+    final_model.fit(features.loc[valid_idx], ratings[valid_idx])
+    
+    # Modell speichern
+    models_dir = Path(__file__).parent.parent / 'models'
+    models_dir.mkdir(exist_ok=True)
+    model_path = models_dir / f'{host}_model.joblib'
+    joblib.dump(final_model, model_path)
+    
+    return metrics, final_model
 
 def print_model_metrics(metrics, host):
     # In Datei loggen
