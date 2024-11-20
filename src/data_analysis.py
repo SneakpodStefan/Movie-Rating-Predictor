@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import Dict
+import logging
 
 def analyze_data(df: pd.DataFrame) -> Dict:
     """
@@ -56,17 +57,32 @@ def analyze_data(df: pd.DataFrame) -> Dict:
     
     return analysis
 
-def print_analysis(analysis: Dict):
-    """
-    Gibt die Analyseergebnisse formatiert aus
-    """
-    print("\nFilmanalyse")
-    print("===========")
-    print(f"\nGesamtzahl Filme: {analysis['total_movies']}")
+def print_analysis(df, features):
+    # Basis-Statistiken in Konsole
+    print("Daten geladen und bereinigt:")
+    print(f"Anzahl Filme: {len(df)}\n")
     
+    print("Bewertungen pro Host:")
+    for host in ['Christoph', 'Robert', 'Stefan']:
+        ratings = df[host].dropna()
+        print(f"{host}: {len(ratings)} Bewertungen, Durchschnitt: {ratings.mean():.2f}")
+    
+    print(f"\nFeature Engineering abgeschlossen:")
+    print(f"Anzahl Features: {len(features.columns)}")
+    
+    # Feature-Details nur ins Log schreiben
+    logging.info("\nFeature Details:")
+    for col in features.columns:
+        valid_count = features[col].notna().sum()
+        logging.info(f"{col}: {valid_count} gültige Werte")
+    
+    # Nur kurze Zusammenfassung in Konsole
+    print("Feature Engineering erfolgreich abgeschlossen.")
+    
+    # Bewertungsstatistiken weiterhin in der Konsole zeigen
     print("\nBewertungsstatistiken pro Host:")
     print("--------------------------------")
-    for host, stats in analysis['host_stats'].items():
+    for host, stats in df['host_stats'].items():
         print(f"\n{host}:")
         print(f"Anzahl Bewertungen: {stats['count']}")
         print(f"Durchschnitt: {stats['mean']:.2f}")
@@ -76,23 +92,23 @@ def print_analysis(analysis: Dict):
     
     print("\nIMDB Vergleich:")
     print("--------------")
-    print(f"Durchschnitt: {analysis['imdb_stats']['mean']:.2f}")
-    print(f"Median: {analysis['imdb_stats']['median']:.2f}")
-    print(f"Standardabweichung: {analysis['imdb_stats']['std']:.2f}")
+    print(f"Durchschnitt: {df['imdb_stats']['mean']:.2f}")
+    print(f"Median: {df['imdb_stats']['median']:.2f}")
+    print(f"Standardabweichung: {df['imdb_stats']['std']:.2f}")
     
     print("\nTop 10 Genres:")
     print("-------------")
-    for genre, count in analysis['top_genres'].items():
+    for genre, count in df['top_genres'].items():
         print(f"{genre}: {count}")
     
     print("\nZeitliche Verteilung:")
     print("-------------------")
-    print(f"Ältester Film: {analysis['year_stats']['oldest']}")
-    print(f"Neuester Film: {analysis['year_stats']['newest']}")
-    print(f"Häufigstes Jahr: {analysis['year_stats']['most_common']}")
+    print(f"Ältester Film: {df['year_stats']['oldest']}")
+    print(f"Neuester Film: {df['year_stats']['newest']}")
+    print(f"Häufigstes Jahr: {df['year_stats']['most_common']}")
     
     print("\nKorrelationen mit IMDB:")
     print("----------------------")
-    for key, corr in analysis['correlations'].items():
+    for key, corr in df['correlations'].items():
         host = key.split('_')[0]
         print(f"{host}: {corr:.3f}") 
