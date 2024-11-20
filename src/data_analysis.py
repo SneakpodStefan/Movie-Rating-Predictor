@@ -112,3 +112,63 @@ def print_analysis(df, features):
     for key, corr in df['correlations'].items():
         host = key.split('_')[0]
         print(f"{host}: {corr:.3f}") 
+
+def analyze_genre_preferences(df: pd.DataFrame) -> Dict:
+    """Analysiert die Genre-Präferenzen der Hosts im Vergleich zu IMDB"""
+    genre_stats = {}
+    
+    for host in ['Christoph', 'Robert', 'Stefan']:
+        host_stats = {}
+        host_ratings = df[host].dropna()
+        
+        # Für jedes Genre
+        all_genres = []
+        for genres in df['Genre']:
+            all_genres.extend(genres)
+        unique_genres = list(set(all_genres))
+        
+        for genre in unique_genres:
+            # Filme mit diesem Genre finden
+            genre_movies = df[df['Genre'].apply(lambda x: genre in x)]
+            genre_ratings = genre_movies[[host, 'IMDB_Rating']].dropna()
+            
+            if len(genre_ratings) >= 5:  # Mindestens 5 Bewertungen
+                # Normalisiere IMDB auf 1-10 Skala
+                imdb_mean = genre_ratings['IMDB_Rating'].mean()
+                host_mean = genre_ratings[host].mean()
+                
+                host_stats[genre] = {
+                    'count': len(genre_ratings),
+                    'host_mean': host_mean,
+                    'imdb_mean': imdb_mean,
+                    'diff_to_imdb': host_mean - imdb_mean,
+                    'ratio_to_imdb': host_mean / imdb_mean
+                }
+        
+        # Nach Abweichung von IMDB sortieren
+        host_stats = dict(sorted(
+            host_stats.items(),
+            key=lambda x: abs(x[1]['diff_to_imdb']),
+            reverse=True
+        ))
+        genre_stats[host] = host_stats
+    
+    return genre_stats
+
+def print_genre_analysis(genre_stats: Dict):
+    print("\nGenre-Präferenzen im Vergleich zu IMDB:")
+    print("====================================")
+    
+    for host, stats in genre_stats.items():
+        print(f"\n{host}:")
+        print("-" * (len(host) + 1))
+        print("Genre (Anzahl) | Host Ø | IMDB Ø | Δ zu IMDB | Faktor")
+        print("-" * 60)
+        
+        for genre, values in stats.items():
+            if values['count'] >= 10:  # Nur relevante Genres zeigen
+                print(f"{genre:12} ({values['count']:3d}) | "
+                      f"{values['host_mean']:6.2f} | "
+                      f"{values['imdb_mean']:6.2f} | "
+                      f"{values['diff_to_imdb']:+6.2f} | "
+                      f"x{values['ratio_to_imdb']:4.2f}")

@@ -16,10 +16,16 @@ def create_base_features(df: pd.DataFrame) -> pd.DataFrame:
     features['runtime'] = df['Runtime']
     features['fsk'] = pd.Categorical(df['FSK']).codes
     
+    # Sprach-Features (als kategorische Variable)
+    features['language'] = pd.Categorical(
+        df['Sprache'].fillna('Unknown')
+    ).codes
+    
     # Genre-Features (wichtigste zuerst)
     main_genres = [
         'Drama', 'Comedy', 'Thriller', 'Action', 
-        'Crime', 'Adventure', 'Romance', 'Sci-Fi'
+        'Crime', 'Adventure', 'Romance', 'Sci-Fi',
+        'Horror', 'Biography', 'Animation', 'Family'  # Erweiterte Liste
     ]
     
     for genre in main_genres:
@@ -34,19 +40,19 @@ def create_base_features(df: pd.DataFrame) -> pd.DataFrame:
     features['is_drama_romance'] = features['is_drama'] & features['is_romance']
     features['is_scifi_action'] = features['is_sci-fi'] & features['is_action']
     
-    # Sprach-Features
-    features['is_english'] = (df['Sprache'] == 'English').astype(int)
-    features['is_german'] = (df['Sprache'] == 'German').astype(int)
+    # IMDB Genre-Score
+    genre_imdb_means = {}
+    for genres in df['Genre']:
+        for genre in genres:
+            if genre not in genre_imdb_means:
+                genre_movies = df[df['Genre'].apply(lambda x: genre in x)]
+                genre_imdb_means[genre] = genre_movies['IMDB_Rating'].mean()
     
-    # Gewichtete Genre-Scores basierend auf Host-Präferenzen
-    features['action_adventure_score'] = (
-        features['is_action'] * 0.5 + 
-        features['is_adventure'] * 0.5
-    )
-    
-    features['drama_romance_score'] = (
-        features['is_drama'] * 0.6 + 
-        features['is_romance'] * 0.4
+    # Sicherer Lambda mit Fallback für leere Genre-Listen
+    features['genres_imdb_mean'] = df['Genre'].apply(
+        lambda genres: sum(genre_imdb_means.get(g, 0) for g in genres) / len(genres) 
+        if len(genres) > 0 
+        else df['IMDB_Rating'].mean()  # Fallback auf durchschnittliche IMDB-Bewertung
     )
     
     # Runtime-basierte Features
@@ -99,67 +105,51 @@ def analyze_feature_importance(features: pd.DataFrame, target: pd.Series,
     return importance
 
 def create_cast_features(df):
-    """Erstellt aggregierte Cast-Features"""
     features = pd.DataFrame()
     
-    # Listen extrahieren
     df['Regisseur'] = df['Regisseur'].fillna('[]').apply(eval)
     df['Hauptdarsteller'] = df['Hauptdarsteller'].fillna('[]').apply(eval)
+    df['Folge'] = df['Folge'].str.extract(r'#(\d+)').astype(float)
+    df = df.sort_values('Folge', ascending=False)
     
-    # Durchschnittliche Bewertung pro Film für jeden Host
-    host_ratings = {}
-    for host in ['Christoph', 'Robert', 'Stefan']:
-        host_ratings[host] = {}
-        for idx, row in df.iterrows():
-            if pd.notna(row[host]):
-                host_ratings[host][idx] = row[host]
-    
-    def calculate_avg_rating(row, person_type):
-        if not row[person_type]:  # Leere Liste
+    def calculate_host_specific_rating(row, person_type, host_name):
+        """Berechnet das Rating für einen spezifischen Host und Personentyp"""
+        if not row[person_type]:
             return 0
         
-        all_ratings = []
-        for host in host_ratings:
-            person_ratings = []
-            # Finde alle Filme mit dieser Person
-            relevant_indices = df[
-                df[person_type].apply(lambda x: any(p in x for p in row[person_type]))
-            ].index
-            
-            # Sammle alle Bewertungen für diese Filme
-            for idx in relevant_indices:
-                if idx in host_ratings[host]:
-                    person_ratings.append(host_ratings[host][idx])
-            
-            if person_ratings:  # Nur wenn Bewertungen vorhanden
-                all_ratings.append(np.mean(person_ratings))
+        current_folge = row['Folge']
+        person_ratings = []
         
-        return np.mean(all_ratings) if all_ratings else 0
+        for person in row[person_type]:
+            relevant_movies = df[
+                (df[person_type].apply(lambda x: isinstance(x, list) and person in x)) &
+                (df['Folge'] < current_folge)
+            ]
+            
+            ratings = relevant_movies[host_name].dropna()
+            
+            if len(ratings) >= 2:
+                weights = np.linspace(1, 2, len(ratings))
+                avg_rating = np.average(ratings, weights=weights)
+                person_ratings.append(avg_rating)
+            elif len(ratings) > 0:
+                person_ratings.append(ratings.mean())
+        
+        if person_ratings:
+            top_ratings = sorted(person_ratings, reverse=True)[:2]
+            return np.mean(top_ratings)
+        return 0
     
-    # Aggregierte Features
-    features['director_avg_rating'] = df.apply(
-        lambda row: calculate_avg_rating(row, 'Regisseur'),
-        axis=1
-    )
-    
-    features['actor_avg_rating'] = df.apply(
-        lambda row: calculate_avg_rating(row, 'Hauptdarsteller'),
-        axis=1
-    )
-    
-    # Häufigkeits-Features
-    features['frequent_director'] = df['Regisseur'].apply(
-        lambda x: int(len(x) > 0 and any(
-            len(df[df['Regisseur'].apply(lambda y: d in y)]) >= 3 
-            for d in x
-        ))
-    )
-    
-    features['frequent_actor'] = df['Hauptdarsteller'].apply(
-        lambda x: int(len(x) > 0 and any(
-            len(df[df['Hauptdarsteller'].apply(lambda y: a in y)]) >= 3
-            for a in x
-        ))
-    )
+    # Features für jeden Host erstellen
+    for host in ['Christoph', 'Robert', 'Stefan']:
+        features[f'{host.lower()}_director_rating'] = df.apply(
+            lambda row: calculate_host_specific_rating(row, 'Regisseur', host),
+            axis=1
+        )
+        
+        features[f'{host.lower()}_actor_rating'] = df.apply(
+            lambda row: calculate_host_specific_rating(row, 'Hauptdarsteller', host),
+            axis=1
+        )
     
     return features

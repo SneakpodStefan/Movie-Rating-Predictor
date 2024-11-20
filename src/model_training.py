@@ -47,9 +47,23 @@ def train_host_model(features: pd.DataFrame,
     """
     Trainiert ein Modell für einen spezifischen Host mit 5-fold Cross-Validation
     """
+    # Nur relevante Features für den Host auswählen
+    host_features = features.copy()
+    
+    # Entferne Actor/Director Ratings von anderen Hosts
+    columns_to_drop = []
+    for other_host in ['christoph', 'robert', 'stefan']:
+        if other_host != host.lower():
+            columns_to_drop.extend([
+                f'{other_host}_actor_rating',
+                f'{other_host}_director_rating'
+            ])
+    
+    host_features = host_features.drop(columns=columns_to_drop)
+    
     # Entferne Zeilen mit fehlenden Werten
     valid_idx = ratings.dropna().index
-    X = features.loc[valid_idx]
+    X = host_features.loc[valid_idx]
     y = ratings[valid_idx]
     
     # 5-fold Cross-Validation
@@ -126,7 +140,7 @@ def train_host_model(features: pd.DataFrame,
         min_samples_leaf=1,
         random_state=42
     )
-    final_model.fit(features.loc[valid_idx], ratings[valid_idx])
+    final_model.fit(host_features.loc[valid_idx], ratings[valid_idx])
     
     # Modell speichern
     models_dir = Path(__file__).parent.parent / 'models'
