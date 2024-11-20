@@ -2,22 +2,29 @@ import os
 from pathlib import Path
 from src.data_preparation import load_and_clean_data
 from src.data_analysis import analyze_data, print_analysis
+from src.feature_engineering import create_base_features
+from src.model_training import train_host_model, print_model_metrics
 
 def main():
-    # Finde den Basis-Pfad des Projekts
     current_dir = Path(__file__).parent
     DATA_PATH = current_dir / "data" / "raw" / "Sneakpod Punkte.csv"
     
     print("Movie Rating Predictor")
     print("=====================")
     
-    # Daten laden und bereinigen
     if DATA_PATH.exists():
+        # Daten laden und bereinigen
         df = load_and_clean_data(str(DATA_PATH))
         
-        # Datenanalyse durchführen
-        analysis = analyze_data(df)
-        print_analysis(analysis)
+        # Feature Engineering
+        features = create_base_features(df)
+        
+        # Modelle für jeden Host trainieren
+        for host in ['Christoph', 'Robert', 'Stefan']:
+            ratings = df[host]
+            if len(ratings.dropna()) > 0:
+                metrics, model = train_host_model(features, ratings, host)
+                print_model_metrics(metrics, host)
     else:
         print(f"Fehler: Keine Daten gefunden unter {DATA_PATH}")
         return
