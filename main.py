@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from src.data_preparation import load_and_clean_data
+from src.data_analysis import analyze_data, print_analysis
 
 def main():
     # Finde den Basis-Pfad des Projekts
@@ -9,18 +10,16 @@ def main():
     
     print("Movie Rating Predictor")
     print("=====================")
-    print(f"Suche Daten unter: {DATA_PATH}")
     
     # Daten laden und bereinigen
     if DATA_PATH.exists():
         df = load_and_clean_data(str(DATA_PATH))
-        print("\nDatei erfolgreich geladen!")
+        
+        # Datenanalyse durchführen
+        analysis = analyze_data(df)
+        print_analysis(analysis)
     else:
         print(f"Fehler: Keine Daten gefunden unter {DATA_PATH}")
-        print("\nVerfügbare Dateien in data/raw:")
-        raw_dir = current_dir / "data" / "raw"
-        if raw_dir.exists():
-            print(list(raw_dir.glob("*")))
         return
 
 if __name__ == "__main__":
