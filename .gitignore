@@ -42,4 +42,6 @@ models/*.pkl
 *.log
 
 # Lokale Konfiguration
-config.local.ini 
+config.local.ini models/*.joblib
+__pycache__/
+*.pyc

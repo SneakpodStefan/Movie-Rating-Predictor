@@ -1,7 +1,14 @@
 import os
 from pathlib import Path
 from src.data_preparation import load_and_clean_data
-from src.data_analysis import analyze_data, print_analysis, analyze_genre_preferences, print_genre_analysis
+from src.data_analysis import (
+    analyze_data, 
+    print_analysis, 
+    analyze_genre_preferences, 
+    print_genre_analysis,
+    analyze_keywords,
+    print_keyword_analysis
+)
 from src.feature_engineering import create_base_features
 from src.model_training import train_host_model, print_model_metrics, setup_logging
 
@@ -22,9 +29,14 @@ def main():
         # Feature Engineering
         features = create_base_features(df)
         
+        # Datenanalyse
+        analysis = analyze_data(df)
+        print_analysis(df, features, analysis)
+        
         # Genre-Analyse
         genre_stats = analyze_genre_preferences(df)
         print_genre_analysis(genre_stats)
+        
         
         # Modelle für jeden Host trainieren
         for host in ['Christoph', 'Robert', 'Stefan']:
