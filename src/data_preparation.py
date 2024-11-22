@@ -32,6 +32,15 @@ def load_and_clean_data(file_path):
     # Bereinige Genre (von String zu Liste)
     df['Genre'] = df['Genre'].apply(lambda x: eval(x) if isinstance(x, str) else [])
     
+    # Verbesserte Keyword-Bereinigung
+    df['Plot_Keywords'] = df['Plot_Keywords'].apply(
+        lambda x: eval(x) if isinstance(x, str) and x.strip().startswith('[') else []
+    )
+    
+    # Validierung der Keywords
+    keyword_count = df['Plot_Keywords'].apply(len).sum()
+    print(f"Gesamt Anzahl Keywords: {keyword_count}")
+    
     print(f"Daten geladen und bereinigt:")
     print(f"Anzahl Filme: {len(df)}")
     print("\nBewertungen pro Host:")

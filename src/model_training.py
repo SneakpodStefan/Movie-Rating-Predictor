@@ -152,31 +152,21 @@ def train_host_model(features: pd.DataFrame,
     return metrics, final_model
 
 def print_model_metrics(metrics, host):
-    # In Datei loggen
-    logging.info(f"\nDetaillierte Metriken für {host}")
-    logging.info("=" * 50)
-    logging.info(f"Anzahl Bewertungen: {metrics['n_train']}")
-    logging.info("\nFehlermetriken (5-Fold Cross-Validation):")
-    logging.info(f"Train RMSE: {metrics['train_rmse']:.3f}")
-    logging.info(f"Test RMSE: {metrics['test_rmse']:.3f}")
-    logging.info(f"Train MAE: {metrics['train_mae']:.3f}")
-    logging.info(f"Test MAE: {metrics['test_mae']:.3f}")
-    logging.info(f"Train R²: {metrics['train_r2']:.3f}")
-    logging.info(f"Test R²: {metrics['test_r2']:.3f}")
-    logging.info("\nFeature Importance:")
-    for feature, importance in metrics['feature_importance'].items():
-        logging.info(f"{feature:20} {importance:.3f}")
-    
-    # Nur kompakte Ausgabe in Konsole
     print(f"\nModell für {host}")
     print("=" * (len(host) + 10))
     print(f"Bewertungen: {metrics['n_train']}")
-    
-    print("\nPerformance (5-Fold CV):")
     print(f"Test RMSE: {metrics['test_rmse']:.3f}")
     print(f"Test R²:   {metrics['test_r2']:.3f}")
     
-    print("\nWichtigste Features:")
-    for feature, importance in list(metrics['feature_importance'].items())[:5]:
-        print(f"{feature:20} {importance:.3f}")
-    print()
+    # Top 3 Features
+    print("\nTop Features:")
+    for feature, importance in list(metrics['feature_importance'].items())[:3]:
+        feature_name = feature.replace('keyword_', '') if feature.startswith('keyword_') else feature
+        print(f"{feature_name:20} {importance:.3f}")
+    
+    # Detaillierte Metriken ins Log
+    logging.info(f"\nDetaillierte Metriken für {host}")
+    logging.info("=" * 50)
+    logging.info(f"Alle Features nach Wichtigkeit:")
+    for feature, importance in metrics['feature_importance'].items():
+        logging.info(f"{feature:20} {importance:.3f}")

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict
 import logging
+from collections import Counter
 
 def analyze_data(df: pd.DataFrame) -> Dict:
     """
@@ -55,63 +56,32 @@ def analyze_data(df: pd.DataFrame) -> Dict:
         correlations[f'{host}_imdb_corr'] = corr
     analysis['correlations'] = correlations
     
+    # Keyword-Analyse
+    keyword_analysis = analyze_keywords(df)
+    analysis['keyword_stats'] = keyword_analysis
+    
     return analysis
 
-def print_analysis(df, features):
-    # Basis-Statistiken in Konsole
-    print("Daten geladen und bereinigt:")
-    print(f"Anzahl Filme: {len(df)}\n")
-    
-    print("Bewertungen pro Host:")
+def print_analysis(df: pd.DataFrame, features: pd.DataFrame, analysis: Dict):
+    print("\nBewertungsstatistiken:")
+    print("=====================")
     for host in ['Christoph', 'Robert', 'Stefan']:
         ratings = df[host].dropna()
-        print(f"{host}: {len(ratings)} Bewertungen, Durchschnitt: {ratings.mean():.2f}")
+        print(f"{host}: {len(ratings)} Bewertungen, Ø {ratings.mean():.2f}")
     
-    print(f"\nFeature Engineering abgeschlossen:")
-    print(f"Anzahl Features: {len(features.columns)}")
+    # IMDB Vergleich
+    print(f"\nIMDB: Ø {analysis['imdb_stats']['mean']:.2f}")
     
-    # Feature-Details nur ins Log schreiben
-    logging.info("\nFeature Details:")
-    for col in features.columns:
-        valid_count = features[col].notna().sum()
-        logging.info(f"{col}: {valid_count} gültige Werte")
+    # Rest ins Log schreiben
+    logging.info("\nDetaillierte Statistiken:")
+    logging.info("======================")
+    logging.info(f"\nTop Genres:")
+    for genre, count in analysis['top_genres'].items():
+        logging.info(f"{genre:12} {count:4d}")
     
-    # Nur kurze Zusammenfassung in Konsole
-    print("Feature Engineering erfolgreich abgeschlossen.")
-    
-    # Bewertungsstatistiken weiterhin in der Konsole zeigen
-    print("\nBewertungsstatistiken pro Host:")
-    print("--------------------------------")
-    for host, stats in df['host_stats'].items():
-        print(f"\n{host}:")
-        print(f"Anzahl Bewertungen: {stats['count']}")
-        print(f"Durchschnitt: {stats['mean']:.2f}")
-        print(f"Median: {stats['median']:.2f}")
-        print(f"Standardabweichung: {stats['std']:.2f}")
-        print(f"Min/Max: {stats['min']:.1f} / {stats['max']:.1f}")
-    
-    print("\nIMDB Vergleich:")
-    print("--------------")
-    print(f"Durchschnitt: {df['imdb_stats']['mean']:.2f}")
-    print(f"Median: {df['imdb_stats']['median']:.2f}")
-    print(f"Standardabweichung: {df['imdb_stats']['std']:.2f}")
-    
-    print("\nTop 10 Genres:")
-    print("-------------")
-    for genre, count in df['top_genres'].items():
-        print(f"{genre}: {count}")
-    
-    print("\nZeitliche Verteilung:")
-    print("-------------------")
-    print(f"Ältester Film: {df['year_stats']['oldest']}")
-    print(f"Neuester Film: {df['year_stats']['newest']}")
-    print(f"Häufigstes Jahr: {df['year_stats']['most_common']}")
-    
-    print("\nKorrelationen mit IMDB:")
-    print("----------------------")
-    for key, corr in df['correlations'].items():
-        host = key.split('_')[0]
-        print(f"{host}: {corr:.3f}") 
+    logging.info(f"\nZeitliche Verteilung:")
+    logging.info(f"Ältester Film: {analysis['year_stats']['oldest']}")
+    logging.info(f"Neuester Film: {analysis['year_stats']['newest']}")
 
 def analyze_genre_preferences(df: pd.DataFrame) -> Dict:
     """Analysiert die Genre-Präferenzen der Hosts im Vergleich zu IMDB"""
@@ -156,19 +126,97 @@ def analyze_genre_preferences(df: pd.DataFrame) -> Dict:
     return genre_stats
 
 def print_genre_analysis(genre_stats: Dict):
-    print("\nGenre-Präferenzen im Vergleich zu IMDB:")
-    print("====================================")
-    
+    # Nur ins Log schreiben
+    logging.info("\nDetaillierte Genre-Analyse:")
+    logging.info("=========================")
     for host, stats in genre_stats.items():
-        print(f"\n{host}:")
-        print("-" * (len(host) + 1))
-        print("Genre (Anzahl) | Host Ø | IMDB Ø | Δ zu IMDB | Faktor")
-        print("-" * 60)
-        
+        logging.info(f"\n{host}:")
         for genre, values in stats.items():
-            if values['count'] >= 10:  # Nur relevante Genres zeigen
-                print(f"{genre:12} ({values['count']:3d}) | "
-                      f"{values['host_mean']:6.2f} | "
-                      f"{values['imdb_mean']:6.2f} | "
-                      f"{values['diff_to_imdb']:+6.2f} | "
-                      f"x{values['ratio_to_imdb']:4.2f}")
+            if values['count'] >= 10:
+                logging.info(f"{genre:12} ({values['count']:3d}) | "
+                           f"{values['host_mean']:6.2f} | "
+                           f"{values['imdb_mean']:6.2f} | "
+                           f"{values['diff_to_imdb']:+6.2f}")
+
+def analyze_keywords(df: pd.DataFrame) -> Dict:
+    """Analysiert die häufigsten Keywords und ihre Bewertungskorrelationen"""
+    print("\nStarting keyword analysis...")
+    
+    keyword_stats = {}
+    hosts = ['Christoph', 'Robert', 'Stefan']
+    
+    # Host-Durchschnitte vorab berechnen
+    host_means = {
+        host: df[host].mean() 
+        for host in hosts
+    }
+    
+    # Für jedes Keyword Statistiken berechnen
+    for idx, row in df.iterrows():
+        keywords = row['Plot_Keywords']
+        if isinstance(keywords, list):
+            for keyword in keywords:
+                keyword = keyword.lower().strip()
+                if keyword not in keyword_stats:
+                    keyword_stats[keyword] = {
+                        'count': 0,
+                        'host_stats': {
+                            host: {
+                                'sum': 0, 
+                                'count': 0,
+                                'mean': 0,
+                                'diff_to_overall': 0
+                            } for host in hosts
+                        }
+                    }
+                
+                keyword_stats[keyword]['count'] += 1
+                
+                # Host-Bewertungen sammeln
+                for host in hosts:
+                    if pd.notna(row[host]):
+                        stats = keyword_stats[keyword]['host_stats'][host]
+                        stats['sum'] += row[host]
+                        stats['count'] += 1
+                        if stats['count'] > 0:
+                            stats['mean'] = stats['sum'] / stats['count']
+                            stats['diff_to_overall'] = stats['mean'] - host_means[host]
+    
+    # Top Keywords ausgeben
+    print(f"\nAnzahl unterschiedlicher Keywords: {len(keyword_stats)}")
+    print("\nTop 10 häufigste Keywords:")
+    sorted_keywords = sorted(keyword_stats.items(), key=lambda x: x[1]['count'], reverse=True)
+    for keyword, stats in sorted_keywords[:10]:
+        print(f"{keyword}: {stats['count']}")
+    
+    return keyword_stats
+
+def print_keyword_analysis(keyword_stats: Dict):
+    # Log statt Print für die detaillierte Keyword-Analyse
+    logging.info("\nDetaillierte Keyword-Analyse:")
+    logging.info("============================")
+    
+    # Sortiere Keywords nach Häufigkeit
+    sorted_keywords = sorted(
+        keyword_stats.items(),
+        key=lambda x: x[1]['count'],
+        reverse=True
+    )
+    
+    # Schreibe alle Keywords ins Log
+    for keyword, stats in sorted_keywords:
+        if stats['count'] >= 20:  # Mindestens 20 Filme
+            logging.info(f"\n{keyword} ({stats['count']} Filme):")
+            logging.info("-" * (len(keyword) + len(str(stats['count'])) + 9))
+            
+            for host, host_stat in stats['host_stats'].items():
+                if host_stat['count'] > 0:
+                    diff = host_stat['diff_to_overall']
+                    direction = "↑" if diff > 0 else "↓" if diff < 0 else "→"
+                    logging.info(f"{host}: {host_stat['mean']:.2f} "
+                               f"({direction} {abs(diff):.2f}) "
+                               f"aus {host_stat['count']} Bewertungen")
+    
+    # Nur eine Zusammenfassung in der Konsole
+    print(f"\nKeyword-Analyse: {len(keyword_stats)} verschiedene Keywords gefunden")
+    print(f"Details wurden ins Log geschrieben")

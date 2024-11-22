@@ -73,7 +73,12 @@ def create_base_features(df: pd.DataFrame) -> pd.DataFrame:
     
     # Cast Features hinzufügen
     cast_features = create_cast_features(df)
-    features = pd.concat([features, cast_features], axis=1)
+    
+    # Keyword Features hinzufügen
+    keyword_features = create_keyword_features(df)
+    
+    # Alle Features zusammenführen
+    features = pd.concat([features, cast_features, keyword_features], axis=1)
     
     # Nur Zusammenfassung in Konsole
     print(f"\nFeature Engineering abgeschlossen:")
@@ -153,3 +158,34 @@ def create_cast_features(df):
         )
     
     return features
+
+def create_keyword_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Erstellt Features aus Plot-Keywords"""
+    keyword_features = pd.DataFrame()
+    
+    # Sammle alle Keywords
+    all_keywords = []
+    for keywords in df['Plot_Keywords']:
+        if isinstance(keywords, list):
+            all_keywords.extend([k.lower().strip() for k in keywords])
+    
+    # Top Keywords nach Häufigkeit
+    keyword_counts = Counter(all_keywords)
+    
+    # Feature-Erstellung für Top 30 Keywords (statt 20)
+    top_keywords = [k for k, _ in keyword_counts.most_common(30)]
+    
+    for keyword in top_keywords:
+        col_name = f'keyword_{keyword.replace(" ", "_").replace("-", "_")}'
+        keyword_features[col_name] = df['Plot_Keywords'].apply(
+            lambda x: 1 if isinstance(x, list) and 
+                          any(k.lower().strip() == keyword for k in x) 
+            else 0
+        )
+    
+    # Zusätzliche aggregierte Keyword-Features
+    keyword_features['keyword_count'] = df['Plot_Keywords'].apply(
+        lambda x: len(x) if isinstance(x, list) else 0
+    )
+    
+    return keyword_features
